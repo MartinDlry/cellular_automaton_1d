@@ -4,13 +4,13 @@
 #include <iomanip>
 #include <cassert>
 #include <sstream>
+#include <regex>
 
-constexpr char CA1D::Rule::FILE_BEGIN_SIGNATURE[];
-constexpr char CA1D::Rule::FILE_END_SIGNATURE[];
+#include "rule_file_format.hpp"
 
 CA1D::Rule::Rule( const char* filePath )
 {
-    std::ifstream is;
+    /*std::ifstream is;
     is.open( filePath );
     std::string str;
     
@@ -19,10 +19,6 @@ CA1D::Rule::Rule( const char* filePath )
     is >> str;
     assert( str == "format");
     
-    int format;
-    is >> format;
-    assert( format == 0 || format == 1 );
-
     is >> str;
     assert( str == "number_of_states");
 
@@ -34,22 +30,91 @@ CA1D::Rule::Rule( const char* filePath )
     mStateChangeCases = new uint8_t[numberofCases];
 
     uint16_t temp;
-    if( format == 0 )
-    {
-        for( uint32_t i = 0 ; i < numberofCases ; i ++ )
-        {    
-            is >> temp;
-            mStateChangeCases[i] = temp;
-            assert( mStateChangeCases[i] < mNumberOfStates );
-        }
-    }
-    else
-    {
-
+    for( uint32_t i = 0 ; i < numberofCases ; i ++ )
+    {    
+        is >> temp;
+        mStateChangeCases[i] = temp;
+        assert( mStateChangeCases[i] < mNumberOfStates );
     }
     is >> str;
     assert( str == RULE_FILE_END_SIGNATURE);
+    */
 }
+
+bool nextNonEmptyLine( std::ifstream& ifs , std::string& str ) //return false is reached end of file before finding non empty line and str isn't changed
+{
+    std::regex emptyLine( RULE_FILE_EMPTY_LINE_REGEX );
+    std::string str2;
+    do
+    {
+        if( ifs.eof() ) return false;
+        getline( ifs , str2 );
+    }while( std::regex_match( str2 , emptyLine ) );
+    str = str2;
+    return true;
+}
+
+bool CA1D::Rule::isRuleFileValid( const char* filePath )
+{
+    
+    std::ifstream is;
+    is.open( filePath );
+    std::string str;
+    std::stringstream strs;
+    
+    nextNonEmptyLine( is , str );
+
+    // signature test
+    if( !std::regex_match( str , std::regex( RULE_FILE_FIRST_LINE_REGEX ) ) ) return false;
+    nextNonEmptyLine( is , str );
+
+    // number of states test
+    if( !std::regex_match( str , std::regex( RULE_FILE_NUMBER_OF_STATE_LINE_REGEX ) ) ) return false;
+    uint numberOfStates;
+    (std::stringstream)str >> str >> numberOfStates;
+    if( numberOfStates > MAX_NUMBER_OF_STATES ) return false;
+
+    nextNonEmptyLine( is , str );
+
+    //default line test
+    if( !std::regex_match( str , std::regex( RULE_FILE_DEFAULT_LINE_REGEX ) ) ) return false;
+    uint defaultResultState;
+    (std::stringstream)str >> str >> defaultResultState;
+    if( defaultResultState >= numberOfStates ) return false;
+
+    //testing cases
+    std::regex lastLineRegex(RULE_FILE_LAST_LINE_REGEX);
+    std::regex casesRegex( RULE_FILE_CASE_LINE_REGEX );
+    std::regex separatorSymbol( RULE_FILE_CASE_SEPARATOR_1 "|" RULE_FILE_CASE_SEPARATOR_2 );
+    std::regex generalStateSymbol( RULE_FILE_GENERAL_CASE_STATE_SYMBOL );
+    std::stringstream ss;
+    std::string state;
+    
+    while( nextNonEmptyLine( is , str ) )
+    {    
+        if( std::regex_match(str, lastLineRegex ) ) break;
+        if( !std::regex_match(str, casesRegex ) ) return false;
+
+        //treating line
+        str = std::regex_replace( str , separatorSymbol , " " ); // replacing separator with spaces
+        ss = std::stringstream(str);
+        for( uint i = 0 ; i < 4 ; i++ )
+        {
+            ss >> str;
+            if( !std::regex_match( str , generalStateSymbol ) && (uint)std::stoi(str) >= numberOfStates )
+                return false;
+        }
+    }
+
+    //end signature test
+    if( !std::regex_match(str, lastLineRegex ) ) return false;
+
+
+    is.close();
+    return true;
+}
+
+
 uint16_t CA1D::Rule::getNumberOfStates()
 {
     return mNumberOfStates;
@@ -74,7 +139,7 @@ std::ostream& operator <<( std::ostream &os, const CA1D::Rule& rule )
     for( i1 = 0 ; i1 < rule.mNumberOfStates ; i1 ++ )
         for( i2 = 0 ; i2 < rule.mNumberOfStates ; i2 ++ )
             for( i3 = 0 ; i3 < rule.mNumberOfStates ; i3 ++ )
-                os << std::setw( maxDigits ) << i1 << "|" << std::setw( maxDigits ) << i2 << "|" << std::setw( maxDigits ) << i3 << " -> " << std::setw( maxDigits ) << (int)rule.getNextState( i1 , i2 , i3 ) << std::endl;
+                os << std::setw( maxDigits ) << i1 << " | " << std::setw( maxDigits ) << i2 << " | " << std::setw( maxDigits ) << i3 << " -> " << std::setw( maxDigits ) << (int)rule.getNextState( i1 , i2 , i3 ) << std::endl;
     
     os.copyfmt(baseIos);//reset formatting
     return os ;

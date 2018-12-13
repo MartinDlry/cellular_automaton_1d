@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <iostream>
 
-#define RULE_FILE_BEGIN_SIGNATURE "_ca1d_rule_begin_"
-#define RULE_FILE_END_SIGNATURE "_ca1d_rule_end_"
 
 class CA1D
 {
@@ -22,14 +20,15 @@ class CA1D
 
                 uint16_t getNumberOfStates();
 
-                void store( const char* filePath , bool compressed );
+                void store( const char* filePath);
+
+                static bool isRuleFileValid( const char* filePath);
                 
             private:
                 uint16_t mNumberOfStates; // max 2^8
                 uint8_t* mStateChangeCases;
 
-                static constexpr char FILE_BEGIN_SIGNATURE[] = RULE_FILE_BEGIN_SIGNATURE;
-                static constexpr char FILE_END_SIGNATURE[] = RULE_FILE_END_SIGNATURE;
+                static const uint16_t MAX_NUMBER_OF_STATES = 256;
 
         };
 
