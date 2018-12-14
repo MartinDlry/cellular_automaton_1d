@@ -5,5 +5,5 @@
 
 int main()
 {   
-    std::cout << CA1D::Rule::isRuleFileValid("rule_exemple.txt") << std::endl;
+    std::cout << CA1D::Rule("rule_exemple.txt") << std::endl;
 }

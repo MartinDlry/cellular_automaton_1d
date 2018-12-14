@@ -4,7 +4,7 @@ main.ex : main.o CA1D.o
 main.o : main.cpp CA1D.hpp
 	g++ -Wall -ansi -pedantic -std=c++11 -c main.cpp
 
-CA1D.o : CA1D.cpp CA1D.hpp
+CA1D.o : CA1D.cpp CA1D.hpp rule_file_format.hpp
 	g++ -Wall -ansi -pedantic -std=c++11 -c CA1D.cpp
 
 clean :

@@ -8,37 +8,64 @@
 
 #include "rule_file_format.hpp"
 
+bool nextNonEmptyLine( std::ifstream& ifs , std::string& str );
+uint32_t base10( uint8_t int1 , uint8_t int2 , uint8_t int3 , uint16_t base );
+
 CA1D::Rule::Rule( const char* filePath )
 {
-    /*std::ifstream is;
+    assert( isRuleFileValid( filePath ) );
+    std::ifstream is;
     is.open( filePath );
     std::string str;
     
-    is >> str;
-    assert( str == FILE_BEGIN_SIGNATURE );
-    is >> str;
-    assert( str == "format");
+    nextNonEmptyLine( is , str );
+    nextNonEmptyLine( is , str );
     
-    is >> str;
-    assert( str == "number_of_states");
+    std::stringstream(str) >> str >> mNumberOfStates; //reading number of states
+    uint32_t tableSize = mNumberOfStates*mNumberOfStates*mNumberOfStates;
+    mStateChangeCases = new uint8_t[tableSize];
 
-    is >> mNumberOfStates;
+    nextNonEmptyLine( is , str );
 
-    assert( mNumberOfStates <= 256 );
+    uint16_t def;
+    std::stringstream(str) >> str >> def;
 
-    uint32_t numberofCases = mNumberOfStates * mNumberOfStates * mNumberOfStates;
-    mStateChangeCases = new uint8_t[numberofCases];
+    for( uint32_t i = 0 ; i < tableSize ; i++ )
+        mStateChangeCases[i] = def;
 
-    uint16_t temp;
-    for( uint32_t i = 0 ; i < numberofCases ; i ++ )
-    {    
-        is >> temp;
-        mStateChangeCases[i] = temp;
-        assert( mStateChangeCases[i] < mNumberOfStates );
+    std::regex lastLineRegex(RULE_FILE_LAST_LINE_REGEX);
+    std::regex separatorSymbol( RULE_FILE_CASE_SEPARATOR_1 "|" RULE_FILE_CASE_SEPARATOR_2 );
+    std::regex generalCaseSymbol( RULE_FILE_GENERAL_CASE_STATE_SYMBOL );
+    uint32_t case_[3] , result , start[3];
+
+    nextNonEmptyLine( is , str );
+    while( !std::regex_match( str , lastLineRegex ) )
+    {
+        str = std::regex_replace( std::regex_replace( str , separatorSymbol , " ") , generalCaseSymbol , std::to_string(mNumberOfStates) ) ;
+
+        std::stringstream(str) >> case_[0] >> case_[1] >> case_[2] >> result;
+        for( uint i = 0 ; i < 3 ; i++ )
+            if( case_[i] == mNumberOfStates )
+                start[i] = 0;
+            else
+                start[i] = case_[i]++;
+
+        for( uint i1 = start[0] ; i1 < case_[0] ; i1++ )
+            for( uint i2 = start[1] ; i2 < case_[1] ; i2++ )
+                for( uint i3 = start[2] ; i3 < case_[2] ; i3++)
+                {
+                    mStateChangeCases[base10( i1 , i2 , i3 , mNumberOfStates)] = result;
+                }
+
+        nextNonEmptyLine( is , str );
     }
-    is >> str;
-    assert( str == RULE_FILE_END_SIGNATURE);
-    */
+
+
+}
+
+CA1D::Rule::~Rule()
+{
+    delete[] mStateChangeCases;
 }
 
 bool nextNonEmptyLine( std::ifstream& ifs , std::string& str ) //return false is reached end of file before finding non empty line and str isn't changed
@@ -122,7 +149,7 @@ uint16_t CA1D::Rule::getNumberOfStates()
 
 uint8_t CA1D::Rule::getNextState( int8_t left , int8_t cell , int8_t right ) const
 {
-    return mStateChangeCases[ (left * mNumberOfStates + cell) * mNumberOfStates + right ];
+    return mStateChangeCases[ base10( left , cell ,right , mNumberOfStates ) ];
 }
 
 std::ostream& operator <<( std::ostream &os, const CA1D::Rule& rule )
@@ -143,4 +170,9 @@ std::ostream& operator <<( std::ostream &os, const CA1D::Rule& rule )
     
     os.copyfmt(baseIos);//reset formatting
     return os ;
+}
+
+uint32_t base10( uint8_t int1 , uint8_t int2 , uint8_t int3 , uint16_t base )
+{
+    return ( int1 * base + int2 ) * base + int3;
 }

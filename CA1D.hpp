@@ -14,6 +14,7 @@ class CA1D
             friend std::ostream& operator <<( std::ostream &os, const CA1D::Rule& rule );
             public:
                 Rule( const char* filePath );
+                ~Rule();
 
                 uint8_t getNextState( int8_t left , int8_t cell , int8_t right ) const;
                 void setNextState( int8_t left , int8_t cell , int8_t right , int8_t result );
