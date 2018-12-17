@@ -63,6 +63,17 @@ CA1D::Rule::Rule( const char* filePath )
 
 }
 
+CA1D::Rule::Rule( const Rule& ruleToCopy) : Rule(ruleToCopy.getNumberOfStates())
+{
+    for( uint32_t i = 0 ; i < mNumberOfStates*mNumberOfStates*mNumberOfStates ; i++ )
+        mStateChangeCases[i] = ruleToCopy.mStateChangeCases[i];
+}
+
+CA1D::Rule::Rule() // shouldnt be called
+{
+    assert(false);
+}
+
 CA1D::Rule::~Rule()
 {
     delete[] mStateChangeCases;
@@ -142,7 +153,7 @@ bool CA1D::Rule::isRuleFileValid( const char* filePath )
 }
 
 
-uint16_t CA1D::Rule::getNumberOfStates()
+uint16_t CA1D::Rule::getNumberOfStates() const 
 {
     return mNumberOfStates;
 }
@@ -175,4 +186,112 @@ std::ostream& operator <<( std::ostream &os, const CA1D::Rule& rule )
 uint32_t base10( uint8_t int1 , uint8_t int2 , uint8_t int3 , uint16_t base )
 {
     return ( int1 * base + int2 ) * base + int3;
+}
+
+
+CA1D::CellularNeighborhood::CellularNeighborhood( const CellularNeighborhood& cnToCopy ) : CA1D::CellularNeighborhood( cnToCopy.mNumberOfStates , cnToCopy.mSize )
+{
+    for( uint64_t i = 0 ; i < mSize ; i ++ )
+        mCells[i] = cnToCopy.mCells[i];
+}
+
+CA1D::CellularNeighborhood::CellularNeighborhood() // shouldnt be called
+{
+    assert(false);
+}
+
+CA1D::CellularNeighborhood::~CellularNeighborhood()
+{
+    delete[] mCells;
+}
+
+void CA1D::CellularNeighborhood::setRandomStates()
+{
+    for( uint64_t i = 0 ; i < mSize ; i++ )
+        mCells[i] = rand() % mNumberOfStates;
+}
+
+void CA1D::CellularNeighborhood::applyRuleNTimes( const Rule& rule , const uint64_t nbOfTimes )
+{
+    assert( rule.getNumberOfStates() == mNumberOfStates );
+    if( nbOfTimes == 0 ) return;
+
+    uint8_t* newStates = new uint8_t[mSize];
+    uint8_t* temp;
+
+    for( uint64_t applied = 0 ; applied < nbOfTimes ; applied ++ )
+    {
+        newStates[0] = rule.getNextState( mCells[ mSize-1] , mCells[0] , mCells[1] );
+
+        for( uint64_t i = 1 ; i < mSize -1 ; i++ )
+            newStates[i] = rule.getNextState( mCells[i-1] , mCells[i] , mCells[i+1] );
+
+        newStates[mSize-1] = rule.getNextState( mCells[ mSize-2 ] , mCells[mSize-1] , mCells[0] );
+
+        //swapping tables
+        temp = mCells;
+        mCells = newStates;
+        newStates = temp;
+    }
+
+    delete newStates;
+}
+
+uint16_t CA1D::CellularNeighborhood::getNumberOfStates() const 
+{
+    return mNumberOfStates;
+}
+
+
+CA1D::CA1D( const Rule& rule , const CellularNeighborhood& cn )
+{
+    assert( rule.getNumberOfStates() == cn.getNumberOfStates() );
+    mGeneration = 0;
+    mRule = Rule(rule);
+    mStart = CellularNeighborhood(cn);
+    mCurrent = CellularNeighborhood(cn);
+}
+
+void CA1D::forwardNGeneration( const uint64_t generations )
+{
+    mCurrent.applyRuleNTimes( mRule , generations );
+    mGeneration += generations;
+}
+
+void CA1D::reset()
+{
+    mCurrent = CellularNeighborhood( mStart );
+    mGeneration = 0;
+}
+
+void CA1D::gotoGeneration( const uint64_t generation )
+{
+    if( mGeneration <= generation )
+        forwardNGeneration( generation - mGeneration );
+    else
+    {
+        reset();
+        forwardNGeneration( generation );
+    }
+}
+
+const CA1D::Rule& CA1D::getRule() const
+{
+    return mRule;
+}
+
+const CA1D::CellularNeighborhood& CA1D::getCellularNeighborhood() const
+{
+    return mCurrent;
+}
+
+std::ostream& operator<< ( std::ostream& os , const CA1D::CellularNeighborhood& cn )
+{
+    os << cn.mNumberOfStates << " x " << cn.mSize << std::endl;
+    for( uint64_t i = 0 ; i < cn.mSize ; i++ )
+        os << (int)cn.mCells[i] << " ";
+
+    os << std::endl;
+    
+    return os;
 }
